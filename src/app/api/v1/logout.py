@@ -7,6 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import UnauthorizedException
 from ...core.security import blacklist_tokens, oauth2_scheme
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["login"])
 
@@ -19,6 +22,8 @@ async def logout(
     db: AsyncSession = Depends(async_get_db),
 ) -> dict[str, str]:
     try:
+        logger.info(f"access_token: {access_token}")
+        logger.info(f"refresh_token: {refresh_token}")
         if not refresh_token:
             raise UnauthorizedException("Refresh token not found")
 

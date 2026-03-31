@@ -1,8 +1,8 @@
 import uuid as uuid_pkg
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, EmailStr, Field, field_serializer
 from uuid6 import uuid7
 
 
@@ -59,10 +59,22 @@ class PersistentDeletion(BaseModel):
         return None
 
 
+# -------------- login/signup --------------
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class SignupRequest(BaseModel):
+    email_address: EmailStr
+    password: Annotated[str, Field(pattern=r"^.{8,}|[0-9]+|[A-Z]+|[a-z]+|[^a-zA-Z0-9]+$")]
+
+
 # -------------- token --------------
 class Token(BaseModel):
     access_token: str
     token_type: str
+    refresh_token: str | None = None
 
 
 class TokenData(BaseModel):
