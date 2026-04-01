@@ -20,6 +20,7 @@ class Room(TimestampMixin, Base):
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default_factory=uuid4, init=False)
     name: Mapped[str] = mapped_column(String(255))
+    floor: Mapped[int] = mapped_column(Integer)
     capacity: Mapped[int] = mapped_column(Integer)
     monthly_rent: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     description: Mapped[str | None] = mapped_column(Text, default=None)

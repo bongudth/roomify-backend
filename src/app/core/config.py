@@ -1,4 +1,6 @@
 import os
+from datetime import date
+from decimal import Decimal
 from enum import Enum
 
 from pydantic import SecretStr, computed_field
@@ -100,6 +102,51 @@ class FirstUserSettings(BaseSettings):
     ADMIN_PASSWORD: str = "!Ch4ng3Th1sP4ssW0rd!"
 
 
+class SeedSettings(BaseSettings):
+    """Defaults for ``scripts/seed_data.py``. Override in ``.env`` for real tenants, rooms, and secrets."""
+
+    SEED_PASSWORD: SecretStr = SecretStr("ChangeMeSeed123!")
+
+    SEED_OWNER_EMAIL: str = "owner@seed.roomify.local"
+    SEED_MANAGER_EMAIL: str = "manager@seed.roomify.local"
+    SEED_OWNER_NAME: str = "Seed Owner"
+    SEED_MANAGER_NAME: str = "Seed Manager"
+
+    SEED_SETTING_ELECTRICITY_PRICE_PER_UNIT: Decimal = Decimal("3500.0000")
+    SEED_SETTING_WATER_FEE_PER_PERSON: Decimal = Decimal("100000.00")
+    SEED_SETTING_SERVICE_FEE_PER_PERSON: Decimal = Decimal("50000.00")
+
+    SEED_ROOM_A_NAME: str = "A-101"
+    SEED_ROOM_B_NAME: str = "B-202"
+    SEED_ROOM_A_FLOOR: int = 1
+    SEED_ROOM_B_FLOOR: int = 2
+    SEED_ROOM_A_CAPACITY: int = 2
+    SEED_ROOM_B_CAPACITY: int = 3
+    SEED_ROOM_A_MONTHLY_RENT: Decimal = Decimal("4500000.00")
+    SEED_ROOM_B_MONTHLY_RENT: Decimal = Decimal("5200000.00")
+    SEED_ROOM_A_DESCRIPTION: str = "Corner room, street view."
+    SEED_ROOM_B_DESCRIPTION: str = "Family-sized unit."
+
+    SEED_TENANT_1_FULL_NAME: str = "Nguyen Van An"
+    SEED_TENANT_1_PHONE: str = "0901000001"
+    SEED_TENANT_1_ID_NUMBER: str = "079099001234"
+    SEED_TENANT_2_FULL_NAME: str = "Tran Thi Binh"
+    SEED_TENANT_2_PHONE: str = "0901000002"
+    SEED_TENANT_2_ID_NUMBER: str = "079099005678"
+
+    SEED_CONTRACT_START_DATE: date = date(2026, 1, 1)
+    SEED_CONTRACT_END_DATE: date = date(2026, 12, 31)
+    SEED_CONTRACT_DURATION_MONTHS: int = 12
+    SEED_CONTRACT_NOTE: str = "Seed contract for room A-101."
+
+    SEED_BILL_MONTH: int = 3
+    SEED_BILL_YEAR: int = 2026
+    SEED_BILL_ELECTRICITY_USAGE: Decimal = Decimal("120.5000")
+    SEED_BILL_ELECTRICITY_UNIT_PRICE_SNAPSHOT: Decimal = Decimal("3500.0000")
+    SEED_BILL_WATER_FEE_PER_PERSON_SNAPSHOT: Decimal = Decimal("100000.00")
+    SEED_BILL_SERVICE_FEE_PER_PERSON_SNAPSHOT: Decimal = Decimal("50000.00")
+
+
 class TestSettings(BaseSettings):
     ...
 
@@ -181,6 +228,7 @@ class Settings(
     PostgresSettings,
     CryptSettings,
     FirstUserSettings,
+    SeedSettings,
     TestSettings,
     RedisCacheSettings,
     ClientSideCacheSettings,
