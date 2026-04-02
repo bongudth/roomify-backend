@@ -39,7 +39,7 @@ async def list_floors(
     result = await crud_floors.get_multi(
         db=db,
         limit=None,
-        is_deleted=False,
+        deleted_at=None,
         return_total_count=False,
     )
     return result["data"]
@@ -51,7 +51,7 @@ async def get_floor(
     floor_id: UUID,
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
-    row = await crud_floors.get(db=db, id=floor_id, is_deleted=False, schema_to_select=FloorRead)
+    row = await crud_floors.get(db=db, id=floor_id, deleted_at=None, schema_to_select=FloorRead)
     if row is None:
         raise NotFoundException("Floor not found")
     return row
@@ -64,7 +64,7 @@ async def update_floor(
     values: FloorUpdate,
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, str]:
-    existing = await crud_floors.get(db=db, id=floor_id, is_deleted=False, schema_to_select=FloorRead)
+    existing = await crud_floors.get(db=db, id=floor_id, deleted_at=None, schema_to_select=FloorRead)
     if existing is None:
         raise NotFoundException("Floor not found")
 
@@ -85,10 +85,10 @@ async def delete_floor(
     floor_id: UUID,
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, str]:
-    if not await crud_floors.exists(db=db, id=floor_id, is_deleted=False):
+    if not await crud_floors.exists(db=db, id=floor_id, deleted_at=None):
         raise NotFoundException("Floor not found")
 
-    if await crud_rooms.exists(db=db, floor_id=floor_id, is_deleted=False):
+    if await crud_rooms.exists(db=db, floor_id=floor_id, deleted_at=None):
         raise BadRequestException("Cannot delete a floor that still has rooms. Remove or reassign rooms first.")
 
     await crud_floors.delete(db=db, id=floor_id)

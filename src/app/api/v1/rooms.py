@@ -22,7 +22,7 @@ async def create_room(
     body: RoomCreate,
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
-    floor = await crud_floors.get(db=db, id=body.floor_id, is_deleted=False, schema_to_select=FloorRead)
+    floor = await crud_floors.get(db=db, id=body.floor_id, deleted_at=None, schema_to_select=FloorRead)
     if floor is None:
         raise NotFoundException("Floor not found")
 
@@ -44,7 +44,7 @@ async def list_rooms(
 ) -> list[Any]:
     kwargs: dict[str, Any] = {
         "limit": None,
-        "is_deleted": False,
+        "deleted_at": None,
         "return_total_count": False,
     }
     if floor_id is not None:
@@ -60,7 +60,7 @@ async def get_room(
     room_id: UUID,
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, Any]:
-    row = await crud_rooms.get(db=db, id=room_id, is_deleted=False, schema_to_select=RoomRead)
+    row = await crud_rooms.get(db=db, id=room_id, deleted_at=None, schema_to_select=RoomRead)
     if row is None:
         raise NotFoundException("Room not found")
     return row
@@ -73,7 +73,7 @@ async def update_room(
     values: RoomUpdate,
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, str]:
-    if not await crud_rooms.exists(db=db, id=room_id, is_deleted=False):
+    if not await crud_rooms.exists(db=db, id=room_id, deleted_at=None):
         raise NotFoundException("Room not found")
 
     payload = values.model_dump(exclude_unset=True)
@@ -84,7 +84,7 @@ async def update_room(
 
     if "floor_id" in payload:
         floor = await crud_floors.get(
-            db=db, id=payload["floor_id"], is_deleted=False, schema_to_select=FloorRead
+            db=db, id=payload["floor_id"], deleted_at=None, schema_to_select=FloorRead
         )
         if floor is None:
             raise NotFoundException("Floor not found")
@@ -100,7 +100,7 @@ async def delete_room(
     room_id: UUID,
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> dict[str, str]:
-    if not await crud_rooms.exists(db=db, id=room_id, is_deleted=False):
+    if not await crud_rooms.exists(db=db, id=room_id, deleted_at=None):
         raise NotFoundException("Room not found")
 
     await crud_rooms.delete(db=db, id=room_id)

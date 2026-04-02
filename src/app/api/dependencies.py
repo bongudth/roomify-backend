@@ -20,7 +20,7 @@ async def get_current_user(
     if token_data is None:
         raise UnauthorizedException("User not authenticated.")
 
-    user = await crud_users.get(db=db, email=token_data.email, is_deleted=False)
+    user = await crud_users.get(db=db, email=token_data.email, deleted_at=None)
 
     if user:
         return user

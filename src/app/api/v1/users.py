@@ -44,7 +44,7 @@ async def read_users(
         db=db,
         offset=compute_offset(page, items_per_page),
         limit=items_per_page,
-        is_deleted=False,
+        deleted_at=None,
     )
 
     response: dict[str, Any] = paginated_response(crud_data=users_data, page=page, items_per_page=items_per_page)
@@ -60,7 +60,7 @@ async def read_users_me(request: Request, current_user: Annotated[dict, Depends(
 async def read_user(
     request: Request, user_id: UUID, db: Annotated[AsyncSession, Depends(async_get_db)]
 ) -> dict[str, Any]:
-    db_user = await crud_users.get(db=db, id=user_id, is_deleted=False, schema_to_select=UserRead)
+    db_user = await crud_users.get(db=db, id=user_id, deleted_at=None, schema_to_select=UserRead)
     if db_user is None:
         raise NotFoundException("User not found")
 
