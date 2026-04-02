@@ -3,7 +3,6 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastcrud import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_staff
@@ -37,24 +36,22 @@ async def create_room(
     return created
 
 
-@router.get("", response_model=PaginatedListResponse[RoomRead])
+@router.get("", response_model=list[RoomRead])
 async def list_rooms(
     request: Request,
     db: Annotated[AsyncSession, Depends(async_get_db)],
-    page: int = 1,
-    items_per_page: int = 50,
     floor_id: Annotated[UUID | None, Query(description="Filter by floor")] = None,
-) -> dict[str, Any]:
+) -> list[Any]:
     kwargs: dict[str, Any] = {
-        "offset": compute_offset(page, items_per_page),
-        "limit": items_per_page,
+        "limit": None,
         "is_deleted": False,
+        "return_total_count": False,
     }
     if floor_id is not None:
         kwargs["floor_id"] = floor_id
 
-    data = await crud_rooms.get_multi(db=db, **kwargs)
-    return paginated_response(crud_data=data, page=page, items_per_page=items_per_page)
+    result = await crud_rooms.get_multi(db=db, **kwargs)
+    return result["data"]
 
 
 @router.get("/{room_id}", response_model=RoomRead)

@@ -3,7 +3,6 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
-from fastcrud import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_staff
@@ -32,20 +31,18 @@ async def create_floor(
     return created
 
 
-@router.get("", response_model=PaginatedListResponse[FloorRead])
+@router.get("", response_model=list[FloorRead])
 async def list_floors(
     request: Request,
     db: Annotated[AsyncSession, Depends(async_get_db)],
-    page: int = 1,
-    items_per_page: int = 50,
-) -> dict[str, Any]:
-    data = await crud_floors.get_multi(
+) -> list[Any]:
+    result = await crud_floors.get_multi(
         db=db,
-        offset=compute_offset(page, items_per_page),
-        limit=items_per_page,
+        limit=None,
         is_deleted=False,
+        return_total_count=False,
     )
-    return paginated_response(crud_data=data, page=page, items_per_page=items_per_page)
+    return result["data"]
 
 
 @router.get("/{floor_id}", response_model=FloorRead)
