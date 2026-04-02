@@ -1,32 +1,24 @@
 from datetime import datetime
 from typing import Annotated
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from ..core.schemas import PersistentDeletion, TimestampSchema, UUIDSchema
+from ..models.enums import UserRole
 
 
 class UserBase(BaseModel):
-    name: Annotated[str, Field(min_length=2, max_length=30, examples=["User Userson"])]
-    username: Annotated[str, Field(min_length=2, max_length=20, pattern=r"^[a-z0-9]+$", examples=["userson"])]
+    name: Annotated[str, Field(min_length=2, max_length=255, examples=["User Userson"])]
     email: Annotated[EmailStr, Field(examples=["user.userson@example.com"])]
-
-
-class User(TimestampSchema, UserBase, UUIDSchema, PersistentDeletion):
-    profile_image_url: Annotated[str, Field(default="https://www.profileimageurl.com")]
-    hashed_password: str
-    is_superuser: bool = False
-    tier_id: int | None = None
 
 
 class UserRead(BaseModel):
-    id: int
+    model_config = ConfigDict(from_attributes=True)
 
-    name: Annotated[str, Field(min_length=2, max_length=30, examples=["User Userson"])]
-    username: Annotated[str, Field(min_length=2, max_length=20, pattern=r"^[a-z0-9]+$", examples=["userson"])]
-    email: Annotated[EmailStr, Field(examples=["user.userson@example.com"])]
-    profile_image_url: str
-    tier_id: int | None
+    id: UUID
+    name: str
+    email: EmailStr
+    role: UserRole
 
 
 class UserCreate(UserBase):
@@ -37,30 +29,18 @@ class UserCreate(UserBase):
 
 class UserCreateInternal(UserBase):
     hashed_password: str
+    role: UserRole = UserRole.MANAGER
 
 
 class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: Annotated[str | None, Field(min_length=2, max_length=30, examples=["User Userberg"], default=None)]
-    username: Annotated[
-        str | None, Field(min_length=2, max_length=20, pattern=r"^[a-z0-9]+$", examples=["userberg"], default=None)
-    ]
+    name: Annotated[str | None, Field(min_length=2, max_length=255, examples=["User Userberg"], default=None)]
     email: Annotated[EmailStr | None, Field(examples=["user.userberg@example.com"], default=None)]
-    profile_image_url: Annotated[
-        str | None,
-        Field(
-            pattern=r"^(https?|ftp)://[^\s/$.?#].[^\s]*$", examples=["https://www.profileimageurl.com"], default=None
-        ),
-    ]
 
 
 class UserUpdateInternal(UserUpdate):
     updated_at: datetime
-
-
-class UserTierUpdate(BaseModel):
-    tier_id: int
 
 
 class UserDelete(BaseModel):

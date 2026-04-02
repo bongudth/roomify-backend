@@ -1,78 +1,50 @@
+"""Create the first admin user if missing (OWNER role). Run from ``src``: ``uv run python -m scripts.create_first_superuser``."""
+
+from __future__ import annotations
+
 import asyncio
 import logging
-from datetime import UTC, datetime
+import sys
+from pathlib import Path
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, MetaData, String, Table, insert, select
-from sqlalchemy.dialects.postgresql import UUID
-from uuid6 import uuid7  # 126
+from sqlalchemy import select
 
-from ..app.core.config import settings
-from ..app.core.db.database import AsyncSession, async_engine, local_session
-from ..app.core.security import get_password_hash
-from ..app.models.user import User
+_SRC_ROOT = Path(__file__).resolve().parents[1]
+if str(_SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SRC_ROOT))
+
+from app.core.config import settings
+from app.core.db.database import local_session
+from app.core.security import get_password_hash
+from app.models.enums import UserRole
+from app.models.user import User
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-async def create_first_user(session: AsyncSession) -> None:
-    try:
-        name = settings.ADMIN_NAME
-        email = settings.ADMIN_EMAIL
-        username = settings.ADMIN_USERNAME
-        hashed_password = get_password_hash(settings.ADMIN_PASSWORD)
-
-        query = select(User).filter_by(email=email)
-        result = await session.execute(query)
-        user = result.scalar_one_or_none()
-
-        if user is None:
-            metadata = MetaData()
-            user_table = Table(
-                "user",
-                metadata,
-                Column("id", Integer, primary_key=True, autoincrement=True, nullable=False),
-                Column("name", String(30), nullable=False),
-                Column("username", String(20), nullable=False, unique=True, index=True),
-                Column("email", String(50), nullable=False, unique=True, index=True),
-                Column("hashed_password", String, nullable=False),
-                Column("profile_image_url", String, default="https://profileimageurl.com"),
-                Column("uuid", UUID(as_uuid=True), default=uuid7, unique=True),
-                Column("created_at", DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False),
-                Column("updated_at", DateTime),
-                Column("deleted_at", DateTime),
-                Column("is_deleted", Boolean, default=False, index=True),
-                Column("is_superuser", Boolean, default=False),
-                Column("tier_id", Integer, ForeignKey("tier.id"), index=True),
-            )
-
-            data = {
-                "name": name,
-                "email": email,
-                "username": username,
-                "hashed_password": hashed_password,
-                "is_superuser": True,
-            }
-
-            stmt = insert(user_table).values(data)
-            async with async_engine.connect() as conn:
-                await conn.execute(stmt)
-                await conn.commit()
-
-            logger.info(f"Admin user {username} created successfully.")
-
-        else:
-            logger.info(f"Admin user {username} already exists.")
-
-    except Exception as e:
-        logger.error(f"Error creating admin user: {e}")
-
-
-async def main():
+async def create_first_user() -> None:
     async with local_session() as session:
-        await create_first_user(session)
+        result = await session.execute(select(User).where(User.email == settings.ADMIN_EMAIL))
+        if result.scalar_one_or_none() is not None:
+            logger.info("Admin user %s already exists.", settings.ADMIN_EMAIL)
+            return
+
+        session.add(
+            User(
+                name=settings.ADMIN_NAME,
+                email=settings.ADMIN_EMAIL,
+                hashed_password=get_password_hash(settings.ADMIN_PASSWORD),
+                role=UserRole.OWNER,
+            )
+        )
+        await session.commit()
+        logger.info("Admin user %s created successfully.", settings.ADMIN_EMAIL)
+
+
+async def main() -> None:
+    await create_first_user()
 
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    asyncio.run(main())

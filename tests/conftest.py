@@ -1,6 +1,7 @@
 from collections.abc import Callable, Generator
 from typing import Any
 from unittest.mock import AsyncMock, Mock
+from uuid import uuid4
 
 import pytest
 from faker import Faker
@@ -12,6 +13,7 @@ from sqlalchemy.orm.session import Session
 
 from src.app.core.config import settings
 from src.app.main import app
+from src.app.models.enums import UserRole
 
 DATABASE_URI = settings.POSTGRES_URI
 DATABASE_PREFIX = settings.POSTGRES_SYNC_PREFIX
@@ -59,44 +61,43 @@ def mock_redis():
 
 
 @pytest.fixture
+def shared_user_identity():
+    return {
+        "id": uuid4(),
+        "name": fake.name(),
+        "email": fake.email(),
+    }
+
+
+@pytest.fixture
 def sample_user_data():
     """Generate sample user data for tests."""
     return {
         "name": fake.name(),
-        "username": fake.user_name(),
         "email": fake.email(),
         "password": fake.password(),
     }
 
 
 @pytest.fixture
-def sample_user_read():
+def sample_user_read(shared_user_identity):
     """Generate a sample UserRead object."""
-    from uuid6 import uuid7
-
     from src.app.schemas.user import UserRead
 
     return UserRead(
-        id=1,
-        uuid=uuid7(),
-        name=fake.name(),
-        username=fake.user_name(),
-        email=fake.email(),
-        profile_image_url=fake.image_url(),
-        is_superuser=False,
-        created_at=fake.date_time(),
-        updated_at=fake.date_time(),
-        tier_id=None,
+        id=shared_user_identity["id"],
+        name=shared_user_identity["name"],
+        email=shared_user_identity["email"],
+        role=UserRole.MANAGER,
     )
 
 
 @pytest.fixture
-def current_user_dict():
+def current_user_dict(shared_user_identity):
     """Mock current user from auth dependency."""
     return {
-        "id": 1,
-        "username": fake.user_name(),
-        "email": fake.email(),
-        "name": fake.name(),
-        "is_superuser": False,
+        "id": shared_user_identity["id"],
+        "email": shared_user_identity["email"],
+        "name": shared_user_identity["name"],
+        "role": UserRole.MANAGER,
     }

@@ -1,6 +1,7 @@
 """Idempotent seed data for Roomify domain models.
 
-Configuration is read from ``src/.env`` via ``app.core.config.settings`` (see ``SeedSettings``).
+Private values (password, seed user emails) come from ``src/.env`` via ``SeedSettings``.
+All other demo rows are defined as constants below — not read from the environment.
 
 Run from the ``src`` directory:
 
@@ -12,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -25,11 +27,51 @@ if str(_SRC_ROOT) not in sys.path:
 from app.core.config import settings
 from app.core.db.database import AsyncSession, local_session
 from app.core.security import get_password_hash
-from app.models import Bill, Contract, ContractTenant, Room, Setting, Tenant, User
+from app.models import Bill, Contract, ContractTenant, Floor, Room, Setting, Tenant, User
 from app.models.enums import ContractStatus, UserRole
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# --- Demo seed content (not from .env) ---
+OWNER_NAME = "Seed Owner"
+MANAGER_NAME = "Seed Manager"
+
+SETTING_ELECTRICITY_PRICE_PER_UNIT = Decimal("3500.0000")
+SETTING_WATER_FEE_PER_PERSON = Decimal("100000.00")
+SETTING_SERVICE_FEE_PER_PERSON = Decimal("50000.00")
+
+ROOM_A_NAME = "A-101"
+ROOM_B_NAME = "B-202"
+FLOOR_1_NAME = "Floor 1"
+FLOOR_1_DESCRIPTION: str | None = None
+FLOOR_2_NAME = "Floor 2"
+FLOOR_2_DESCRIPTION: str | None = None
+ROOM_A_CAPACITY = 2
+ROOM_B_CAPACITY = 3
+ROOM_A_MONTHLY_RENT = Decimal("4500000.00")
+ROOM_B_MONTHLY_RENT = Decimal("5200000.00")
+ROOM_A_DESCRIPTION = "Corner room, street view."
+ROOM_B_DESCRIPTION = "Family-sized unit."
+
+TENANT_1_FULL_NAME = "Nguyen Van An"
+TENANT_1_PHONE = "0901000001"
+TENANT_1_ID_NUMBER = "079099001234"
+TENANT_2_FULL_NAME = "Tran Thi Binh"
+TENANT_2_PHONE = "0901000002"
+TENANT_2_ID_NUMBER = "079099005678"
+
+CONTRACT_START_DATE = date(2026, 1, 1)
+CONTRACT_END_DATE = date(2026, 12, 31)
+CONTRACT_DURATION_MONTHS = 12
+CONTRACT_NOTE = "Seed contract for room A-101."
+
+BILL_MONTH = 3
+BILL_YEAR = 2026
+BILL_ELECTRICITY_USAGE = Decimal("120.5000")
+BILL_ELECTRICITY_UNIT_PRICE_SNAPSHOT = Decimal("3500.0000")
+BILL_WATER_FEE_PER_PERSON_SNAPSHOT = Decimal("100000.00")
+BILL_SERVICE_FEE_PER_PERSON_SNAPSHOT = Decimal("50000.00")
 
 
 def _not_deleted(model):
@@ -43,9 +85,9 @@ async def seed_setting(session: AsyncSession) -> None:
         return
     session.add(
         Setting(
-            electricity_price_per_unit=settings.SEED_SETTING_ELECTRICITY_PRICE_PER_UNIT,
-            water_fee_per_person=settings.SEED_SETTING_WATER_FEE_PER_PERSON,
-            service_fee_per_person=settings.SEED_SETTING_SERVICE_FEE_PER_PERSON,
+            electricity_price_per_unit=SETTING_ELECTRICITY_PRICE_PER_UNIT,
+            water_fee_per_person=SETTING_WATER_FEE_PER_PERSON,
+            service_fee_per_person=SETTING_SERVICE_FEE_PER_PERSON,
         )
     )
     await session.flush()
@@ -53,7 +95,7 @@ async def seed_setting(session: AsyncSession) -> None:
 
 
 async def seed_users(session: AsyncSession) -> None:
-    hashed = get_password_hash(settings.SEED_PASSWORD.get_secret_value())
+    hashed_password = get_password_hash(settings.SEED_PASSWORD.get_secret_value())
 
     result = await session.execute(
         select(User).where(User.email == settings.SEED_OWNER_EMAIL, _not_deleted(User))
@@ -62,9 +104,9 @@ async def seed_users(session: AsyncSession) -> None:
     if owner is None:
         session.add(
             User(
-                name=settings.SEED_OWNER_NAME,
+                name=OWNER_NAME,
                 email=settings.SEED_OWNER_EMAIL,
-                password=hashed,
+                hashed_password=hashed_password,
                 role=UserRole.OWNER,
             )
         )
@@ -80,9 +122,9 @@ async def seed_users(session: AsyncSession) -> None:
     if manager is None:
         session.add(
             User(
-                name=settings.SEED_MANAGER_NAME,
+                name=MANAGER_NAME,
                 email=settings.SEED_MANAGER_EMAIL,
-                password=hashed,
+                hashed_password=hashed_password,
                 role=UserRole.MANAGER,
             )
         )
@@ -92,88 +134,118 @@ async def seed_users(session: AsyncSession) -> None:
         logger.info("Seed manager user already exists.")
 
 
-async def seed_rooms(session: AsyncSession) -> tuple[Room, Room]:
+async def _ensure_floor_by_name(
+    session: AsyncSession,
+    name: str,
+    description: str | None,
+) -> Floor:
     result = await session.execute(
-        select(Room).where(Room.name == settings.SEED_ROOM_A_NAME, _not_deleted(Room))
+        select(Floor).where(Floor.name == name, _not_deleted(Floor)).limit(1)
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        row = Floor(name=name, description=description)
+        session.add(row)
+        await session.flush()
+        logger.info("Created floor %r.", name)
+        return row
+    updated = False
+    if row.description != description:
+        row.description = description
+        updated = True
+    if updated:
+        await session.flush()
+        logger.info("Updated floor %r metadata.", name)
+    else:
+        logger.info("Floor %r already exists.", name)
+    return row
+
+
+async def seed_rooms(session: AsyncSession) -> tuple[Room, Room]:
+    floor_for_a = await _ensure_floor_by_name(session, FLOOR_1_NAME, FLOOR_1_DESCRIPTION)
+    floor_for_b = await _ensure_floor_by_name(session, FLOOR_2_NAME, FLOOR_2_DESCRIPTION)
+
+    result = await session.execute(
+        select(Room).where(Room.name == ROOM_A_NAME, _not_deleted(Room))
     )
     room_a = result.scalar_one_or_none()
     if room_a is None:
         room_a = Room(
-            name=settings.SEED_ROOM_A_NAME,
-            floor=settings.SEED_ROOM_A_FLOOR,
-            capacity=settings.SEED_ROOM_A_CAPACITY,
-            monthly_rent=settings.SEED_ROOM_A_MONTHLY_RENT,
-            description=settings.SEED_ROOM_A_DESCRIPTION,
+            name=ROOM_A_NAME,
+            floor_id=floor_for_a.id,
+            capacity=ROOM_A_CAPACITY,
+            monthly_rent=ROOM_A_MONTHLY_RENT,
+            description=ROOM_A_DESCRIPTION,
         )
         session.add(room_a)
         await session.flush()
-        logger.info("Created room %s.", settings.SEED_ROOM_A_NAME)
+        logger.info("Created room %s.", ROOM_A_NAME)
     else:
-        if room_a.floor != settings.SEED_ROOM_A_FLOOR:
-            room_a.floor = settings.SEED_ROOM_A_FLOOR
+        if room_a.floor_id != floor_for_a.id:
+            room_a.floor_id = floor_for_a.id
             await session.flush()
-            logger.info("Updated room %s floor to %s.", settings.SEED_ROOM_A_NAME, settings.SEED_ROOM_A_FLOOR)
+            logger.info("Updated room %s to floor %r.", ROOM_A_NAME, FLOOR_1_NAME)
         else:
-            logger.info("Room %s already exists.", settings.SEED_ROOM_A_NAME)
+            logger.info("Room %s already exists.", ROOM_A_NAME)
 
     result = await session.execute(
-        select(Room).where(Room.name == settings.SEED_ROOM_B_NAME, _not_deleted(Room))
+        select(Room).where(Room.name == ROOM_B_NAME, _not_deleted(Room))
     )
     room_b = result.scalar_one_or_none()
     if room_b is None:
         room_b = Room(
-            name=settings.SEED_ROOM_B_NAME,
-            floor=settings.SEED_ROOM_B_FLOOR,
-            capacity=settings.SEED_ROOM_B_CAPACITY,
-            monthly_rent=settings.SEED_ROOM_B_MONTHLY_RENT,
-            description=settings.SEED_ROOM_B_DESCRIPTION,
+            name=ROOM_B_NAME,
+            floor_id=floor_for_b.id,
+            capacity=ROOM_B_CAPACITY,
+            monthly_rent=ROOM_B_MONTHLY_RENT,
+            description=ROOM_B_DESCRIPTION,
         )
         session.add(room_b)
         await session.flush()
-        logger.info("Created room %s.", settings.SEED_ROOM_B_NAME)
+        logger.info("Created room %s.", ROOM_B_NAME)
     else:
-        if room_b.floor != settings.SEED_ROOM_B_FLOOR:
-            room_b.floor = settings.SEED_ROOM_B_FLOOR
+        if room_b.floor_id != floor_for_b.id:
+            room_b.floor_id = floor_for_b.id
             await session.flush()
-            logger.info("Updated room %s floor to %s.", settings.SEED_ROOM_B_NAME, settings.SEED_ROOM_B_FLOOR)
+            logger.info("Updated room %s to floor %r.", ROOM_B_NAME, FLOOR_2_NAME)
         else:
-            logger.info("Room %s already exists.", settings.SEED_ROOM_B_NAME)
+            logger.info("Room %s already exists.", ROOM_B_NAME)
 
     return room_a, room_b
 
 
 async def seed_tenants(session: AsyncSession) -> tuple[Tenant, Tenant]:
     result = await session.execute(
-        select(Tenant).where(Tenant.id_number == settings.SEED_TENANT_1_ID_NUMBER, _not_deleted(Tenant))
+        select(Tenant).where(Tenant.id_number == TENANT_1_ID_NUMBER, _not_deleted(Tenant))
     )
     t1 = result.scalar_one_or_none()
     if t1 is None:
         t1 = Tenant(
-            full_name=settings.SEED_TENANT_1_FULL_NAME,
-            phone=settings.SEED_TENANT_1_PHONE,
-            id_number=settings.SEED_TENANT_1_ID_NUMBER,
+            full_name=TENANT_1_FULL_NAME,
+            phone=TENANT_1_PHONE,
+            id_number=TENANT_1_ID_NUMBER,
         )
         session.add(t1)
         await session.flush()
-        logger.info("Created tenant %s.", settings.SEED_TENANT_1_ID_NUMBER)
+        logger.info("Created tenant %s.", TENANT_1_ID_NUMBER)
     else:
-        logger.info("Tenant %s already exists.", settings.SEED_TENANT_1_ID_NUMBER)
+        logger.info("Tenant %s already exists.", TENANT_1_ID_NUMBER)
 
     result = await session.execute(
-        select(Tenant).where(Tenant.id_number == settings.SEED_TENANT_2_ID_NUMBER, _not_deleted(Tenant))
+        select(Tenant).where(Tenant.id_number == TENANT_2_ID_NUMBER, _not_deleted(Tenant))
     )
     t2 = result.scalar_one_or_none()
     if t2 is None:
         t2 = Tenant(
-            full_name=settings.SEED_TENANT_2_FULL_NAME,
-            phone=settings.SEED_TENANT_2_PHONE,
-            id_number=settings.SEED_TENANT_2_ID_NUMBER,
+            full_name=TENANT_2_FULL_NAME,
+            phone=TENANT_2_PHONE,
+            id_number=TENANT_2_ID_NUMBER,
         )
         session.add(t2)
         await session.flush()
-        logger.info("Created tenant %s.", settings.SEED_TENANT_2_ID_NUMBER)
+        logger.info("Created tenant %s.", TENANT_2_ID_NUMBER)
     else:
-        logger.info("Tenant %s already exists.", settings.SEED_TENANT_2_ID_NUMBER)
+        logger.info("Tenant %s already exists.", TENANT_2_ID_NUMBER)
 
     return t1, t2
 
@@ -184,7 +256,7 @@ async def seed_contract_and_links(
     tenant_a: Tenant,
     tenant_b: Tenant,
 ) -> None:
-    start = settings.SEED_CONTRACT_START_DATE
+    start = CONTRACT_START_DATE
     result = await session.execute(
         select(Contract).where(
             Contract.room_id == room_a.id,
@@ -196,18 +268,18 @@ async def seed_contract_and_links(
     if contract is None:
         contract = Contract(
             room_id=room_a.id,
-            start_date=settings.SEED_CONTRACT_START_DATE,
-            end_date=settings.SEED_CONTRACT_END_DATE,
-            duration_months=settings.SEED_CONTRACT_DURATION_MONTHS,
+            start_date=CONTRACT_START_DATE,
+            end_date=CONTRACT_END_DATE,
+            duration_months=CONTRACT_DURATION_MONTHS,
             monthly_rent_snapshot=room_a.monthly_rent,
             status=ContractStatus.ACTIVE,
-            note=settings.SEED_CONTRACT_NOTE,
+            note=CONTRACT_NOTE,
         )
         session.add(contract)
         await session.flush()
-        logger.info("Created seed contract for %s.", settings.SEED_ROOM_A_NAME)
+        logger.info("Created seed contract for %s.", ROOM_A_NAME)
     else:
-        logger.info("Seed contract for %s already exists.", settings.SEED_ROOM_A_NAME)
+        logger.info("Seed contract for %s already exists.", ROOM_A_NAME)
 
     for tenant in (tenant_a, tenant_b):
         result = await session.execute(
@@ -227,7 +299,7 @@ async def seed_contract_and_links(
 
 
 async def seed_bill(session: AsyncSession, room_a: Room) -> None:
-    start = settings.SEED_CONTRACT_START_DATE
+    start = CONTRACT_START_DATE
     result = await session.execute(
         select(Contract).where(
             Contract.room_id == room_a.id,
@@ -244,16 +316,16 @@ async def seed_bill(session: AsyncSession, room_a: Room) -> None:
         select(Bill).where(
             Bill.room_id == room_a.id,
             Bill.contract_id == contract.id,
-            Bill.month == settings.SEED_BILL_MONTH,
-            Bill.year == settings.SEED_BILL_YEAR,
+            Bill.month == BILL_MONTH,
+            Bill.year == BILL_YEAR,
             _not_deleted(Bill),
         )
     )
     if result.scalar_one_or_none() is not None:
         logger.info(
             "Seed bill for %s-%02d already exists.",
-            settings.SEED_BILL_YEAR,
-            settings.SEED_BILL_MONTH,
+            BILL_YEAR,
+            BILL_MONTH,
         )
         return
 
@@ -261,12 +333,12 @@ async def seed_bill(session: AsyncSession, room_a: Room) -> None:
         Bill(
             room_id=room_a.id,
             contract_id=contract.id,
-            month=settings.SEED_BILL_MONTH,
-            year=settings.SEED_BILL_YEAR,
-            electricity_usage=settings.SEED_BILL_ELECTRICITY_USAGE,
-            electricity_unit_price_snapshot=settings.SEED_BILL_ELECTRICITY_UNIT_PRICE_SNAPSHOT,
-            water_fee_per_person_snapshot=settings.SEED_BILL_WATER_FEE_PER_PERSON_SNAPSHOT,
-            service_fee_per_person_snapshot=settings.SEED_BILL_SERVICE_FEE_PER_PERSON_SNAPSHOT,
+            month=BILL_MONTH,
+            year=BILL_YEAR,
+            electricity_usage=BILL_ELECTRICITY_USAGE,
+            electricity_unit_price_snapshot=BILL_ELECTRICITY_UNIT_PRICE_SNAPSHOT,
+            water_fee_per_person_snapshot=BILL_WATER_FEE_PER_PERSON_SNAPSHOT,
+            service_fee_per_person_snapshot=BILL_SERVICE_FEE_PER_PERSON_SNAPSHOT,
             room_rent_snapshot=room_a.monthly_rent,
             other_fee=Decimal("0.00"),
             other_fee_note=None,
@@ -277,8 +349,8 @@ async def seed_bill(session: AsyncSession, room_a: Room) -> None:
     await session.flush()
     logger.info(
         "Created seed bill for %s-%02d.",
-        settings.SEED_BILL_YEAR,
-        settings.SEED_BILL_MONTH,
+        BILL_YEAR,
+        BILL_MONTH,
     )
 
 

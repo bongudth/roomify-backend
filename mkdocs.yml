@@ -88,7 +88,6 @@ nav:
           - Client Cache: user-guide/caching/client-cache.md
           - Cache Strategies: user-guide/caching/cache-strategies.md
       - Background Tasks: user-guide/background-tasks/index.md
-      - Rate Limiting: user-guide/rate-limiting/index.md
       - Development: user-guide/development.md
       - Production: user-guide/production.md
       - Testing: user-guide/testing.md

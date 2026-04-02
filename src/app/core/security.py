@@ -37,7 +37,7 @@ def get_password_hash(password: str) -> str:
 
 
 async def authenticate_user(email: str, password: str, db: AsyncSession) -> dict[str, Any] | Literal[False]:
-    db_user = await crud_users.get(db=db, email=email, is_deleted=False)
+    db_user = await crud_users.get(db=db, email=email)
 
     if not db_user:
         return False
@@ -93,13 +93,13 @@ async def verify_token(token: str, expected_token_type: TokenType, db: AsyncSess
 
     try:
         payload = jwt.decode(token, SECRET_KEY.get_secret_value(), algorithms=[ALGORITHM])
-        username_or_email: str | None = payload.get("sub")
+        email: str | None = payload.get("sub")
         token_type: str | None = payload.get("token_type")
 
-        if username_or_email is None or token_type != expected_token_type:
+        if email is None or token_type != expected_token_type:
             return None
 
-        return TokenData(username_or_email=username_or_email)
+        return TokenData(email=email)
 
     except JWTError:
         return None

@@ -1,10 +1,12 @@
+import logging
 from typing import Optional
 
 from crudadmin import CRUDAdmin
 
 from ..core.config import EnvironmentOption, settings
 from ..core.db.database import async_get_db
-from .views import register_admin_views
+
+logger = logging.getLogger(__name__)
 
 
 def create_admin_interface() -> Optional[CRUDAdmin]:
@@ -48,6 +50,12 @@ def create_admin_interface() -> Optional[CRUDAdmin]:
         else None,
     )
 
-    register_admin_views(admin)
+    try:
+        from .views import register_admin_views
+
+        register_admin_views(admin)
+    except Exception:
+        # Keep API startup resilient even when admin view models are out of sync.
+        logger.exception("Failed to register admin views.")
 
     return admin

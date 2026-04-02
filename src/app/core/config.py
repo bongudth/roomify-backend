@@ -1,6 +1,4 @@
 import os
-from datetime import date
-from decimal import Decimal
 from enum import Enum
 
 from pydantic import SecretStr, computed_field
@@ -60,7 +58,7 @@ class SQLiteSettings(DatabaseSettings):
 
 
 class MySQLSettings(DatabaseSettings):
-    MYSQL_USER: str = "username"
+    MYSQL_USER: str = "mysql"
     MYSQL_PASSWORD: str = "password"
     MYSQL_SERVER: str = "localhost"
     MYSQL_PORT: int = 5432
@@ -103,48 +101,11 @@ class FirstUserSettings(BaseSettings):
 
 
 class SeedSettings(BaseSettings):
-    """Defaults for ``scripts/seed_data.py``. Override in ``.env`` for real tenants, rooms, and secrets."""
+    """Secrets for ``scripts/seed_data.py`` only. Set in ``.env``; all other seed rows are defined in code."""
 
     SEED_PASSWORD: SecretStr = SecretStr("ChangeMeSeed123!")
-
     SEED_OWNER_EMAIL: str = "owner@seed.roomify.local"
     SEED_MANAGER_EMAIL: str = "manager@seed.roomify.local"
-    SEED_OWNER_NAME: str = "Seed Owner"
-    SEED_MANAGER_NAME: str = "Seed Manager"
-
-    SEED_SETTING_ELECTRICITY_PRICE_PER_UNIT: Decimal = Decimal("3500.0000")
-    SEED_SETTING_WATER_FEE_PER_PERSON: Decimal = Decimal("100000.00")
-    SEED_SETTING_SERVICE_FEE_PER_PERSON: Decimal = Decimal("50000.00")
-
-    SEED_ROOM_A_NAME: str = "A-101"
-    SEED_ROOM_B_NAME: str = "B-202"
-    SEED_ROOM_A_FLOOR: int = 1
-    SEED_ROOM_B_FLOOR: int = 2
-    SEED_ROOM_A_CAPACITY: int = 2
-    SEED_ROOM_B_CAPACITY: int = 3
-    SEED_ROOM_A_MONTHLY_RENT: Decimal = Decimal("4500000.00")
-    SEED_ROOM_B_MONTHLY_RENT: Decimal = Decimal("5200000.00")
-    SEED_ROOM_A_DESCRIPTION: str = "Corner room, street view."
-    SEED_ROOM_B_DESCRIPTION: str = "Family-sized unit."
-
-    SEED_TENANT_1_FULL_NAME: str = "Nguyen Van An"
-    SEED_TENANT_1_PHONE: str = "0901000001"
-    SEED_TENANT_1_ID_NUMBER: str = "079099001234"
-    SEED_TENANT_2_FULL_NAME: str = "Tran Thi Binh"
-    SEED_TENANT_2_PHONE: str = "0901000002"
-    SEED_TENANT_2_ID_NUMBER: str = "079099005678"
-
-    SEED_CONTRACT_START_DATE: date = date(2026, 1, 1)
-    SEED_CONTRACT_END_DATE: date = date(2026, 12, 31)
-    SEED_CONTRACT_DURATION_MONTHS: int = 12
-    SEED_CONTRACT_NOTE: str = "Seed contract for room A-101."
-
-    SEED_BILL_MONTH: int = 3
-    SEED_BILL_YEAR: int = 2026
-    SEED_BILL_ELECTRICITY_USAGE: Decimal = Decimal("120.5000")
-    SEED_BILL_ELECTRICITY_UNIT_PRICE_SNAPSHOT: Decimal = Decimal("3500.0000")
-    SEED_BILL_WATER_FEE_PER_PERSON_SNAPSHOT: Decimal = Decimal("100000.00")
-    SEED_BILL_SERVICE_FEE_PER_PERSON_SNAPSHOT: Decimal = Decimal("50000.00")
 
 
 class TestSettings(BaseSettings):
@@ -168,21 +129,6 @@ class ClientSideCacheSettings(BaseSettings):
 class RedisQueueSettings(BaseSettings):
     REDIS_QUEUE_HOST: str = "localhost"
     REDIS_QUEUE_PORT: int = 6379
-
-
-class RedisRateLimiterSettings(BaseSettings):
-    REDIS_RATE_LIMIT_HOST: str = "localhost"
-    REDIS_RATE_LIMIT_PORT: int = 6379
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def REDIS_RATE_LIMIT_URL(self) -> str:
-        return f"redis://{self.REDIS_RATE_LIMIT_HOST}:{self.REDIS_RATE_LIMIT_PORT}"
-
-
-class DefaultRateLimitSettings(BaseSettings):
-    DEFAULT_RATE_LIMIT_LIMIT: int = 10
-    DEFAULT_RATE_LIMIT_PERIOD: int = 3600
 
 
 class CRUDAdminSettings(BaseSettings):
@@ -233,8 +179,6 @@ class Settings(
     RedisCacheSettings,
     ClientSideCacheSettings,
     RedisQueueSettings,
-    RedisRateLimiterSettings,
-    DefaultRateLimitSettings,
     CRUDAdminSettings,
     EnvironmentSettings,
     CORSSettings,
