@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import ForeignKey, Integer, Numeric, String, Text, Uuid
+from sqlalchemy import ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.db.database import Base
@@ -14,6 +13,7 @@ if TYPE_CHECKING:
     from .bill import Bill
     from .contract import Contract
     from .floor import Floor
+    from .room_type import RoomType
 
 
 class Room(TimestampMixin, Base):
@@ -22,10 +22,11 @@ class Room(TimestampMixin, Base):
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default_factory=uuid4, init=False)
     name: Mapped[str] = mapped_column(String(255))
     floor_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("floor.id"))
+    room_type_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("room_type.id"))
     capacity: Mapped[int] = mapped_column(Integer)
-    monthly_rent: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     description: Mapped[str | None] = mapped_column(Text, default=None)
 
     floor: Mapped[Floor] = relationship(back_populates="rooms", init=False)
+    room_type: Mapped[RoomType] = relationship(back_populates="rooms", init=False)
     contracts: Mapped[list[Contract]] = relationship(back_populates="room", init=False)
     bills: Mapped[list[Bill]] = relationship(back_populates="room", init=False)

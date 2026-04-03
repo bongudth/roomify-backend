@@ -1,8 +1,8 @@
-"""Roomify domain models (user, room, tenant, contract, bill, setting).
+"""Initial schema (Roomify domain + token blacklist).
 
-Revision ID: 7f3a2b1c4d5e
+Revision ID: f8e7d6c5b4a3
 Revises:
-Create Date: 2026-04-01
+Create Date: 2026-04-03
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "7f3a2b1c4d5e"
+revision: str = "f8e7d6c5b4a3"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -21,45 +21,24 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.create_table(
-        "user",
+        "floor",
         sa.Column("id", UUID(as_uuid=True), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
-        sa.Column("email", sa.String(length=320), nullable=False),
-        sa.Column("hashed_password", sa.Text(), nullable=False),
-        sa.Column("role", sa.String(length=20), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_index(op.f("ix_user_email"), "user", ["email"], unique=True)
-
-    op.create_table(
-        "room",
-        sa.Column("id", UUID(as_uuid=True), nullable=False),
-        sa.Column("name", sa.String(length=255), nullable=False),
-        sa.Column("floor", sa.Integer(), nullable=False),
-        sa.Column("capacity", sa.Integer(), nullable=False),
-        sa.Column("monthly_rent", sa.Numeric(14, 2), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-
     op.create_table(
-        "tenant",
+        "room_type",
         sa.Column("id", UUID(as_uuid=True), nullable=False),
-        sa.Column("full_name", sa.String(length=255), nullable=False),
-        sa.Column("phone", sa.String(length=32), nullable=False),
-        sa.Column("id_number", sa.String(length=64), nullable=False),
+        sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("monthly_rent", sa.Numeric(14, 2), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-
     op.create_table(
         "setting",
         sa.Column("id", UUID(as_uuid=True), nullable=False),
@@ -71,7 +50,53 @@ def upgrade() -> None:
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-
+    op.create_table(
+        "tenant",
+        sa.Column("id", UUID(as_uuid=True), nullable=False),
+        sa.Column("full_name", sa.String(length=255), nullable=False),
+        sa.Column("phone", sa.String(length=32), nullable=False),
+        sa.Column("id_number", sa.String(length=64), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_table(
+        "token_blacklist",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("token", sa.String(), nullable=False),
+        sa.Column("expires_at", sa.DateTime(), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(op.f("ix_token_blacklist_token"), "token_blacklist", ["token"], unique=True)
+    op.create_table(
+        "user",
+        sa.Column("id", UUID(as_uuid=True), nullable=False),
+        sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("email", sa.String(length=320), nullable=False),
+        sa.Column("hashed_password", sa.String(), nullable=False),
+        sa.Column("role", sa.String(length=20), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(op.f("ix_user_email"), "user", ["email"], unique=True)
+    op.create_table(
+        "room",
+        sa.Column("id", UUID(as_uuid=True), nullable=False),
+        sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("floor_id", UUID(as_uuid=True), nullable=False),
+        sa.Column("room_type_id", UUID(as_uuid=True), nullable=False),
+        sa.Column("capacity", sa.Integer(), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(["floor_id"], ["floor.id"]),
+        sa.ForeignKeyConstraint(["room_type_id"], ["room_type.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
     op.create_table(
         "contract",
         sa.Column("id", UUID(as_uuid=True), nullable=False),
@@ -89,7 +114,6 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["room_id"], ["room.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-
     op.create_table(
         "contract_tenant",
         sa.Column("id", UUID(as_uuid=True), nullable=False),
@@ -102,7 +126,6 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["tenant_id"], ["tenant.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-
     op.create_table(
         "bill",
         sa.Column("id", UUID(as_uuid=True), nullable=False),
@@ -132,8 +155,12 @@ def downgrade() -> None:
     op.drop_table("bill")
     op.drop_table("contract_tenant")
     op.drop_table("contract")
-    op.drop_table("setting")
-    op.drop_table("tenant")
     op.drop_table("room")
     op.drop_index(op.f("ix_user_email"), table_name="user")
     op.drop_table("user")
+    op.drop_index(op.f("ix_token_blacklist_token"), table_name="token_blacklist")
+    op.drop_table("token_blacklist")
+    op.drop_table("tenant")
+    op.drop_table("setting")
+    op.drop_table("room_type")
+    op.drop_table("floor")

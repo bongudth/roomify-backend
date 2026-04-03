@@ -6,6 +6,14 @@ All other demo rows are defined as constants below — not read from the environ
 Run from the ``src`` directory:
 
   uv run python -m scripts.seed_data
+
+**After replacing the migration chain** (single initial revision), reset the database
+schema and Alembic bookkeeping before upgrading:
+
+1. Drop application tables (or ``DROP SCHEMA public CASCADE; CREATE SCHEMA public;`` in dev).
+2. Purge revision rows: ``DELETE FROM alembic_version;`` (or drop the table).
+3. ``uv run python -m alembic upgrade head`` (from ``src``).
+4. Run this seed script.
 """
 
 from __future__ import annotations
@@ -27,7 +35,7 @@ if str(_SRC_ROOT) not in sys.path:
 from app.core.config import settings
 from app.core.db.database import AsyncSession, local_session
 from app.core.security import get_password_hash
-from app.models import Bill, Contract, ContractTenant, Floor, Room, Setting, Tenant, User
+from app.models import Bill, Contract, ContractTenant, Floor, Room, RoomType, Setting, Tenant, User
 from app.models.enums import ContractStatus, UserRole
 
 logging.basicConfig(level=logging.INFO)
@@ -41,16 +49,20 @@ SETTING_ELECTRICITY_PRICE_PER_UNIT = Decimal("3500.0000")
 SETTING_WATER_FEE_PER_PERSON = Decimal("100000.00")
 SETTING_SERVICE_FEE_PER_PERSON = Decimal("50000.00")
 
-ROOM_A_NAME = "A-101"
-ROOM_B_NAME = "B-202"
-FLOOR_1_NAME = "Floor 1"
+ROOM_A_NAME = "101"
+ROOM_B_NAME = "201"
+FLOOR_1_NAME = "1"
 FLOOR_1_DESCRIPTION: str | None = None
-FLOOR_2_NAME = "Floor 2"
+FLOOR_2_NAME = "2"
 FLOOR_2_DESCRIPTION: str | None = None
 ROOM_A_CAPACITY = 2
 ROOM_B_CAPACITY = 3
-ROOM_A_MONTHLY_RENT = Decimal("4500000.00")
-ROOM_B_MONTHLY_RENT = Decimal("5200000.00")
+ROOM_TYPE_STANDARD_NAME = "Standard double"
+ROOM_TYPE_STANDARD_RENT = Decimal("4500000.00")
+ROOM_TYPE_STANDARD_DESCRIPTION = "Two-person standard layout."
+ROOM_TYPE_FAMILY_NAME = "Family suite"
+ROOM_TYPE_FAMILY_RENT = Decimal("5200000.00")
+ROOM_TYPE_FAMILY_DESCRIPTION = "Larger unit for families."
 ROOM_A_DESCRIPTION = "Corner room, street view."
 ROOM_B_DESCRIPTION = "Family-sized unit."
 
@@ -66,7 +78,7 @@ CONTRACT_END_DATE = date(2026, 12, 31)
 CONTRACT_DURATION_MONTHS = 12
 CONTRACT_NOTE = "Seed contract for room A-101."
 
-BILL_MONTH = 3
+BILL_MONTH = 4
 BILL_YEAR = 2026
 BILL_ELECTRICITY_USAGE = Decimal("120.5000")
 BILL_ELECTRICITY_UNIT_PRICE_SNAPSHOT = Decimal("3500.0000")
@@ -161,9 +173,44 @@ async def _ensure_floor_by_name(
     return row
 
 
+async def _ensure_room_type_by_name(
+    session: AsyncSession,
+    name: str,
+    monthly_rent: Decimal,
+    description: str | None,
+) -> RoomType:
+    result = await session.execute(select(RoomType).where(RoomType.name == name).limit(1))
+    row = result.scalar_one_or_none()
+    if row is None:
+        row = RoomType(name=name, monthly_rent=monthly_rent, description=description)
+        session.add(row)
+        await session.flush()
+        logger.info("Created room type %r.", name)
+        return row
+    updated = False
+    if row.monthly_rent != monthly_rent:
+        row.monthly_rent = monthly_rent
+        updated = True
+    if row.description != description:
+        row.description = description
+        updated = True
+    if updated:
+        await session.flush()
+        logger.info("Updated room type %r metadata.", name)
+    else:
+        logger.info("Room type %r already exists.", name)
+    return row
+
+
 async def seed_rooms(session: AsyncSession) -> tuple[Room, Room]:
     floor_for_a = await _ensure_floor_by_name(session, FLOOR_1_NAME, FLOOR_1_DESCRIPTION)
     floor_for_b = await _ensure_floor_by_name(session, FLOOR_2_NAME, FLOOR_2_DESCRIPTION)
+    type_standard = await _ensure_room_type_by_name(
+        session, ROOM_TYPE_STANDARD_NAME, ROOM_TYPE_STANDARD_RENT, ROOM_TYPE_STANDARD_DESCRIPTION
+    )
+    type_family = await _ensure_room_type_by_name(
+        session, ROOM_TYPE_FAMILY_NAME, ROOM_TYPE_FAMILY_RENT, ROOM_TYPE_FAMILY_DESCRIPTION
+    )
 
     result = await session.execute(
         select(Room).where(Room.name == ROOM_A_NAME, _not_deleted(Room))
@@ -173,18 +220,30 @@ async def seed_rooms(session: AsyncSession) -> tuple[Room, Room]:
         room_a = Room(
             name=ROOM_A_NAME,
             floor_id=floor_for_a.id,
+            room_type_id=type_standard.id,
             capacity=ROOM_A_CAPACITY,
-            monthly_rent=ROOM_A_MONTHLY_RENT,
             description=ROOM_A_DESCRIPTION,
         )
         session.add(room_a)
         await session.flush()
         logger.info("Created room %s.", ROOM_A_NAME)
     else:
+        updated = False
         if room_a.floor_id != floor_for_a.id:
             room_a.floor_id = floor_for_a.id
+            updated = True
+        if room_a.room_type_id != type_standard.id:
+            room_a.room_type_id = type_standard.id
+            updated = True
+        if room_a.capacity != ROOM_A_CAPACITY:
+            room_a.capacity = ROOM_A_CAPACITY
+            updated = True
+        if room_a.description != ROOM_A_DESCRIPTION:
+            room_a.description = ROOM_A_DESCRIPTION
+            updated = True
+        if updated:
             await session.flush()
-            logger.info("Updated room %s to floor %r.", ROOM_A_NAME, FLOOR_1_NAME)
+            logger.info("Updated room %s metadata.", ROOM_A_NAME)
         else:
             logger.info("Room %s already exists.", ROOM_A_NAME)
 
@@ -196,18 +255,30 @@ async def seed_rooms(session: AsyncSession) -> tuple[Room, Room]:
         room_b = Room(
             name=ROOM_B_NAME,
             floor_id=floor_for_b.id,
+            room_type_id=type_family.id,
             capacity=ROOM_B_CAPACITY,
-            monthly_rent=ROOM_B_MONTHLY_RENT,
             description=ROOM_B_DESCRIPTION,
         )
         session.add(room_b)
         await session.flush()
         logger.info("Created room %s.", ROOM_B_NAME)
     else:
+        updated = False
         if room_b.floor_id != floor_for_b.id:
             room_b.floor_id = floor_for_b.id
+            updated = True
+        if room_b.room_type_id != type_family.id:
+            room_b.room_type_id = type_family.id
+            updated = True
+        if room_b.capacity != ROOM_B_CAPACITY:
+            room_b.capacity = ROOM_B_CAPACITY
+            updated = True
+        if room_b.description != ROOM_B_DESCRIPTION:
+            room_b.description = ROOM_B_DESCRIPTION
+            updated = True
+        if updated:
             await session.flush()
-            logger.info("Updated room %s to floor %r.", ROOM_B_NAME, FLOOR_2_NAME)
+            logger.info("Updated room %s metadata.", ROOM_B_NAME)
         else:
             logger.info("Room %s already exists.", ROOM_B_NAME)
 
@@ -271,7 +342,7 @@ async def seed_contract_and_links(
             start_date=CONTRACT_START_DATE,
             end_date=CONTRACT_END_DATE,
             duration_months=CONTRACT_DURATION_MONTHS,
-            monthly_rent_snapshot=room_a.monthly_rent,
+            monthly_rent_snapshot=ROOM_TYPE_STANDARD_RENT,
             status=ContractStatus.ACTIVE,
             note=CONTRACT_NOTE,
         )
@@ -339,7 +410,7 @@ async def seed_bill(session: AsyncSession, room_a: Room) -> None:
             electricity_unit_price_snapshot=BILL_ELECTRICITY_UNIT_PRICE_SNAPSHOT,
             water_fee_per_person_snapshot=BILL_WATER_FEE_PER_PERSON_SNAPSHOT,
             service_fee_per_person_snapshot=BILL_SERVICE_FEE_PER_PERSON_SNAPSHOT,
-            room_rent_snapshot=room_a.monthly_rent,
+            room_rent_snapshot=ROOM_TYPE_STANDARD_RENT,
             other_fee=Decimal("0.00"),
             other_fee_note=None,
             is_paid=False,

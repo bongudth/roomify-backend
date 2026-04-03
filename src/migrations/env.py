@@ -31,6 +31,7 @@ def import_models(package_name):
 
 
 import_models("app.models")
+importlib.import_module("app.core.db.token_blacklist")
 target_metadata = Base.metadata
 
 
