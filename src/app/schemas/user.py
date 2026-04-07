@@ -2,14 +2,14 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.enums import UserRole
 
 
 class UserBase(BaseModel):
     name: Annotated[str, Field(min_length=2, max_length=255, examples=["User Userson"])]
-    email: Annotated[EmailStr, Field(examples=["user.userson@example.com"])]
+    email: Annotated[str, Field(examples=["user.userson@example.com"])]
 
 
 class UserRead(BaseModel):
@@ -17,7 +17,7 @@ class UserRead(BaseModel):
 
     id: UUID
     name: str
-    email: EmailStr
+    email: str
     role: UserRole
 
 
@@ -36,7 +36,7 @@ class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: Annotated[str | None, Field(min_length=2, max_length=255, examples=["User Userberg"], default=None)]
-    email: Annotated[EmailStr | None, Field(examples=["user.userberg@example.com"], default=None)]
+    email: Annotated[str | None, Field(examples=["user.userberg@example.com"], default=None)]
 
 
 class UserUpdateInternal(UserUpdate):

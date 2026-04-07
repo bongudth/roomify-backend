@@ -57,21 +57,27 @@ FLOOR_2_NAME = "2"
 FLOOR_2_DESCRIPTION: str | None = None
 ROOM_A_CAPACITY = 2
 ROOM_B_CAPACITY = 3
-ROOM_TYPE_STANDARD_NAME = "Standard double"
+ROOM_TYPE_STANDARD_NAME = "Phòng tiêu chuẩn"
 ROOM_TYPE_STANDARD_RENT = Decimal("4500000.00")
-ROOM_TYPE_STANDARD_DESCRIPTION = "Two-person standard layout."
-ROOM_TYPE_FAMILY_NAME = "Family suite"
+ROOM_TYPE_STANDARD_DESCRIPTION = "Phòng dành cho 2 người"
+ROOM_TYPE_FAMILY_NAME = "Phòng gia đình"
 ROOM_TYPE_FAMILY_RENT = Decimal("5200000.00")
-ROOM_TYPE_FAMILY_DESCRIPTION = "Larger unit for families."
+ROOM_TYPE_FAMILY_DESCRIPTION = "Phòng dành cho gia đình"
 ROOM_A_DESCRIPTION = "Corner room, street view."
 ROOM_B_DESCRIPTION = "Family-sized unit."
 
 TENANT_1_FULL_NAME = "Nguyen Van An"
 TENANT_1_PHONE = "0901000001"
 TENANT_1_ID_NUMBER = "079099001234"
+TENANT_1_ADDRESS = "123 Nguyen Hue, District 1, Ho Chi Minh City"
+TENANT_1_BIRTHDAY = date(1995, 5, 20)
+TENANT_1_EMAIL = "nguyen.van.an@example.com"
 TENANT_2_FULL_NAME = "Tran Thi Binh"
 TENANT_2_PHONE = "0901000002"
 TENANT_2_ID_NUMBER = "079099005678"
+TENANT_2_ADDRESS = "45 Le Loi, District 1, Ho Chi Minh City"
+TENANT_2_BIRTHDAY = date(1992, 11, 8)
+TENANT_2_EMAIL = "tran.thi.binh@example.com"
 
 CONTRACT_START_DATE = date(2026, 1, 1)
 CONTRACT_END_DATE = date(2026, 12, 31)
@@ -295,12 +301,38 @@ async def seed_tenants(session: AsyncSession) -> tuple[Tenant, Tenant]:
             full_name=TENANT_1_FULL_NAME,
             phone=TENANT_1_PHONE,
             id_number=TENANT_1_ID_NUMBER,
+            address=TENANT_1_ADDRESS,
+            birthday=TENANT_1_BIRTHDAY,
+            email=TENANT_1_EMAIL,
         )
         session.add(t1)
         await session.flush()
         logger.info("Created tenant %s.", TENANT_1_ID_NUMBER)
     else:
-        logger.info("Tenant %s already exists.", TENANT_1_ID_NUMBER)
+        updated = False
+        if t1.full_name != TENANT_1_FULL_NAME:
+            t1.full_name = TENANT_1_FULL_NAME
+            updated = True
+        if t1.phone != TENANT_1_PHONE:
+            t1.phone = TENANT_1_PHONE
+            updated = True
+        if t1.id_number != TENANT_1_ID_NUMBER:
+            t1.id_number = TENANT_1_ID_NUMBER
+            updated = True
+        if t1.address != TENANT_1_ADDRESS:
+            t1.address = TENANT_1_ADDRESS
+            updated = True
+        if t1.birthday != TENANT_1_BIRTHDAY:
+            t1.birthday = TENANT_1_BIRTHDAY
+            updated = True
+        if t1.email != TENANT_1_EMAIL:
+            t1.email = TENANT_1_EMAIL
+            updated = True
+        if updated:
+            await session.flush()
+            logger.info("Updated tenant %s metadata.", TENANT_1_ID_NUMBER)
+        else:
+            logger.info("Tenant %s already exists.", TENANT_1_ID_NUMBER)
 
     result = await session.execute(
         select(Tenant).where(Tenant.id_number == TENANT_2_ID_NUMBER, _not_deleted(Tenant))
@@ -311,12 +343,38 @@ async def seed_tenants(session: AsyncSession) -> tuple[Tenant, Tenant]:
             full_name=TENANT_2_FULL_NAME,
             phone=TENANT_2_PHONE,
             id_number=TENANT_2_ID_NUMBER,
+            address=TENANT_2_ADDRESS,
+            birthday=TENANT_2_BIRTHDAY,
+            email=TENANT_2_EMAIL,
         )
         session.add(t2)
         await session.flush()
         logger.info("Created tenant %s.", TENANT_2_ID_NUMBER)
     else:
-        logger.info("Tenant %s already exists.", TENANT_2_ID_NUMBER)
+        updated = False
+        if t2.full_name != TENANT_2_FULL_NAME:
+            t2.full_name = TENANT_2_FULL_NAME
+            updated = True
+        if t2.phone != TENANT_2_PHONE:
+            t2.phone = TENANT_2_PHONE
+            updated = True
+        if t2.id_number != TENANT_2_ID_NUMBER:
+            t2.id_number = TENANT_2_ID_NUMBER
+            updated = True
+        if t2.address != TENANT_2_ADDRESS:
+            t2.address = TENANT_2_ADDRESS
+            updated = True
+        if t2.birthday != TENANT_2_BIRTHDAY:
+            t2.birthday = TENANT_2_BIRTHDAY
+            updated = True
+        if t2.email != TENANT_2_EMAIL:
+            t2.email = TENANT_2_EMAIL
+            updated = True
+        if updated:
+            await session.flush()
+            logger.info("Updated tenant %s metadata.", TENANT_2_ID_NUMBER)
+        else:
+            logger.info("Tenant %s already exists.", TENANT_2_ID_NUMBER)
 
     return t1, t2
 

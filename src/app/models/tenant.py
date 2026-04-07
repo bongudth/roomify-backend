@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import String, Uuid
+from sqlalchemy import Date, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.db.database import Base
@@ -20,5 +21,8 @@ class Tenant(TimestampMixin, Base):
     full_name: Mapped[str] = mapped_column(String(255))
     phone: Mapped[str] = mapped_column(String(32))
     id_number: Mapped[str] = mapped_column(String(64))
+    address: Mapped[str | None] = mapped_column(Text, default=None)
+    birthday: Mapped[date | None] = mapped_column(Date, default=None)
+    email: Mapped[str | None] = mapped_column(String(255), default=None)
 
     contract_tenants: Mapped[list[ContractTenant]] = relationship(back_populates="tenant", init=False)
